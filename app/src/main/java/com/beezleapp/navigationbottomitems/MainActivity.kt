@@ -15,8 +15,12 @@ import androidx.compose.material3.*
 import androidx.compose.runtime.Composable
 import androidx.compose.runtime.remember
 import androidx.compose.ui.Modifier
-import androidx.compose.ui.graphics.BlendMode.Companion.Screen
-import androidx.compose.ui.tooling.preview.Preview
+import androidx.compose.ui.platform.LocalLifecycleOwner
+import androidx.lifecycle.DefaultLifecycleObserver
+import androidx.lifecycle.LifecycleOwner
+import androidx.lifecycle.ViewModel
+import androidx.lifecycle.ViewModelProvider
+import androidx.lifecycle.viewmodel.compose.viewModel
 import androidx.navigation.NavGraph.Companion.findStartDestination
 import androidx.navigation.compose.NavHost
 import androidx.navigation.compose.composable
@@ -62,12 +66,9 @@ fun Screen() {
                         selected = isSelected,
                         onClick = {
                             navHostController.navigate(item.first) {
-                                popUpTo(navHostController.graph.findStartDestination().id) {
-                                    saveState = true
-                                }
+                                popUpTo(navHostController.graph.findStartDestination().id)
 
                                 launchSingleTop = true
-                                restoreState = true
                             }
                         }
                     )
@@ -83,6 +84,11 @@ fun Screen() {
             composable(items[0].first) {
                 selectedTab = items[0]
 
+                val lifecycle = LocalLifecycleOwner.current
+                val viewModel: ModelDontDestory = viewModel(factory = viewModelFactory {
+                    ModelDontDestory(lifecycle)
+                })
+
                 remember {
                     println("Recomposed first")
 
@@ -93,6 +99,11 @@ fun Screen() {
             }
             composable(items[1].first) {
                 selectedTab = items[1]
+
+                val lifecycle = LocalLifecycleOwner.current
+                val viewModel: ModelDontDestory = viewModel(factory = viewModelFactory {
+                    ModelDontDestory(lifecycle)
+                })
 
                 remember {
                     println("Recomposed second")
@@ -105,3 +116,21 @@ fun Screen() {
         }
     }
 }
+
+inline fun <VM : ViewModel> viewModelFactory(crossinline f: () -> VM) =
+    object : ViewModelProvider.Factory {
+        override fun <T : ViewModel> create(aClass: Class<T>): T = f() as T
+    }
+
+class ModelDontDestory(val lifecycle: LifecycleOwner): ViewModel(), DefaultLifecycleObserver {
+    init {
+        lifecycle.lifecycle.addObserver(this)
+    }
+
+    override fun onDestroy(owner: LifecycleOwner) {
+        super.onDestroy(owner)
+
+        println("This should never happen, this should be kept in memory")
+    }
+}
+
