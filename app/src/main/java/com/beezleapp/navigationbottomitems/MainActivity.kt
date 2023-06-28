@@ -116,6 +116,7 @@ fun Screen() {
 
                         constraintLayout.setBackgroundColor(context.getColor(android.R.color.holo_red_dark))
                         val editText = EditText(context)
+                        editText.setText("Click here")
 
                         editText.id = View.generateViewId()
 
