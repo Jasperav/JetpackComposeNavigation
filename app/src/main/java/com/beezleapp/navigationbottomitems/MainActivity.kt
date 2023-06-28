@@ -1,9 +1,15 @@
 package com.beezleapp.navigationbottomitems
 
+import android.graphics.drawable.Icon
 import android.os.Bundle
+import android.view.View
+import android.widget.EditText
 import androidx.activity.ComponentActivity
 import androidx.activity.compose.setContent
+import androidx.compose.foundation.clickable
+import androidx.compose.foundation.layout.Column
 import androidx.compose.foundation.layout.fillMaxSize
+import androidx.compose.foundation.layout.fillMaxWidth
 import androidx.compose.foundation.layout.padding
 import androidx.compose.material.BottomNavigation
 import androidx.compose.material.BottomNavigationItem
@@ -16,6 +22,10 @@ import androidx.compose.runtime.Composable
 import androidx.compose.runtime.remember
 import androidx.compose.ui.Modifier
 import androidx.compose.ui.platform.LocalLifecycleOwner
+import androidx.compose.ui.semantics.Role
+import androidx.compose.ui.viewinterop.AndroidView
+import androidx.constraintlayout.widget.ConstraintLayout
+import androidx.constraintlayout.widget.ConstraintSet
 import androidx.lifecycle.DefaultLifecycleObserver
 import androidx.lifecycle.LifecycleOwner
 import androidx.lifecycle.ViewModel
@@ -26,6 +36,7 @@ import androidx.navigation.compose.NavHost
 import androidx.navigation.compose.composable
 import androidx.navigation.compose.rememberNavController
 import com.beezleapp.navigationbottomitems.ui.theme.NavigationBottomItemsTheme
+import java.util.*
 
 class MainActivity : ComponentActivity() {
     override fun onCreate(savedInstanceState: Bundle?) {
@@ -56,19 +67,29 @@ fun Screen() {
 
     Scaffold(
         bottomBar = {
-            BottomNavigation {
+            NavigationBar {
                 items.forEachIndexed { index, item ->
+                    selectedTab = item
+
                     val isSelected = index == items.indexOf(selectedTab)
 
-                    BottomNavigationItem(
-                        icon = { Icon(if (isSelected) item.second else item.third, contentDescription = null) },
+                    NavigationBarItem(
+                        icon = {
+                            Icon(
+                                if (isSelected) item.second else item.third,
+                                contentDescription = null
+                            )
+                        },
                         label = { Text(text = item.first) },
                         selected = isSelected,
                         onClick = {
                             navHostController.navigate(item.first) {
-                                popUpTo(navHostController.graph.findStartDestination().id)
+                                popUpTo(navHostController.graph.findStartDestination().id) {
+                                    saveState = true
+                                }
 
                                 launchSingleTop = true
+                                restoreState = true
                             }
                         }
                     )
@@ -82,55 +103,54 @@ fun Screen() {
             Modifier.padding(it)
         ) {
             composable(items[0].first) {
-                selectedTab = items[0]
+                Scaffold(topBar = {
+                    TopAppBar(
+                        title = {
+                            Text(text = "Text",
+                            )
+                        },
+                    )
+                }) {
+                    AndroidView(modifier = Modifier.padding(it).fillMaxSize(), factory = { context ->
+                        val constraintLayout = ConstraintLayout(context)
 
-                val lifecycle = LocalLifecycleOwner.current
-                val viewModel: ModelDontDestory = viewModel(factory = viewModelFactory {
-                    ModelDontDestory(lifecycle)
-                })
+                        constraintLayout.setBackgroundColor(context.getColor(android.R.color.holo_red_dark))
+                        val editText = EditText(context)
 
-                remember {
-                    println("Recomposed first")
+                        editText.id = View.generateViewId()
 
-                    ""
+                        constraintLayout.addView(editText)
+
+                        val constraintSet = ConstraintSet()
+
+                        constraintSet.clone(constraintLayout)
+
+                        constraintSet.connect(editText.id, ConstraintSet.BOTTOM, ConstraintSet.PARENT_ID, ConstraintSet.BOTTOM)
+                        constraintSet.connect(editText.id, ConstraintSet.START, ConstraintSet.PARENT_ID, ConstraintSet.START)
+                        constraintSet.connect(editText.id, ConstraintSet.END, ConstraintSet.PARENT_ID, ConstraintSet.END)
+
+                        constraintSet.applyTo(constraintLayout)
+
+                        constraintLayout
+                    })
                 }
-
-                Text("first")
             }
             composable(items[1].first) {
-                selectedTab = items[1]
-
-                val lifecycle = LocalLifecycleOwner.current
-                val viewModel: ModelDontDestory = viewModel(factory = viewModelFactory {
-                    ModelDontDestory(lifecycle)
-                })
-
-                remember {
-                    println("Recomposed second")
-
-                    ""
+                Column {
+                    Text("Second")
+                    Button(onClick = {
+                        navHostController.navigate(
+                            "nested/" + UUID.randomUUID().toString()
+                        )
+                    }) {
+                        Text(text = "Go to nested")
+                    }
                 }
-
-                Text("Second")
+            }
+            composable("nested/{id}") {
+                Text("nested")
             }
         }
-    }
-}
-
-inline fun <VM : ViewModel> viewModelFactory(crossinline f: () -> VM) =
-    object : ViewModelProvider.Factory {
-        override fun <T : ViewModel> create(aClass: Class<T>): T = f() as T
-    }
-
-class ModelDontDestory(val lifecycle: LifecycleOwner): ViewModel(), DefaultLifecycleObserver {
-    init {
-        lifecycle.lifecycle.addObserver(this)
-    }
-
-    override fun onDestroy(owner: LifecycleOwner) {
-        super.onDestroy(owner)
-
-        println("This should never happen, this should be kept in memory")
     }
 }
 
